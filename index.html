@@ -334,6 +334,9 @@
             };
 
             prototype.isSupportsLocalStorage = function() {
+                //IE has a known bug with localStorage when executing HTML app from file system.
+                //LocalStorage needs a domain name
+
                 try {
                     return 'localStorage' in window && window['localStorage'] !== null;
                 } catch (e) {
