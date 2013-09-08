@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>15 puzzle</title>
+    <meta charset="UTF-8"/>
+    <style type="text/css">
+        body {
+            padding: 0;
+            margin: 50px;
+            font-size: 16px;
+        }
+
+        button {
+            width: 140px;
+            display: block;
+        }
+
+        #gameField {
+            display: inline-block;
+            float: left;
+            width: 200px;
+            height: 200px;
+            background-color: #FAEBD7;
+            border: solid 10px #DEB887;
+            margin-right: 50px;
+        }
+
+        #blockField {
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            background-color: #FFFFFF;
+            z-index: 100;
+            position: relative;
+        }
+
+        .puzzle {
+            width: 47px;
+            height: 47px;
+            position: absolute;
+            text-align: center;
+            border: solid 2px;
+            background-color: #F0F8FF;
+            cursor: pointer;
+            display: table;
+            font-size: 1.2em;
+            -webkit-transition: all 0.2s ease;
+            -o-transition: all 0.2s ease;
+            -moz-transition: all 0.2s ease
+            -ms-transition: all 0.2s ease;
+            transition: all 0.2s ease;
+        }
+
+        .puzzle > span {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
+        .buttonsBlock {
+            margin-top: 30px
+        }
+
+        #history {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border: solid 2px;
+            background-color: #FAEBD7;
+            overflow-x: hidden;
+            overflow-y: auto;
+            margin-left: -200px;
+            display: none;
+        }
+
+        #history table {
+            width: 100%;
+        }
+
+        #history thead {
+            background-color: #DEB887;
+            font-weight: bold;
+        }
+
+        #history td {
+            border: solid 1px;
+        }
+
+        .center-wrapper {
+            padding-left: 50%;;
+        }
+
+        #closeHistory {
+            margin-left: 130px;
+        }
+    </style>
+    <script>
+        var xMax, yMax;
+        xMax = yMax = 4;//field size
+        var blockSize = 50;//block size in pixels
+        var topPadding = 60, leftPadding = 60;//padding for game field with border
+        var animationDelay = 200;
+        var displayTo = 'gameField';
+        var shuffleSteps = 20;
+        var shuffledSteps = 0;
+
+        var Field = (function() {
+            //private vars
+            var steps;
+            var gameStarted;
+            var xNull, yNull;
+            var prevXNull, prevYNull;
+
+            var puzzles;
+
+            var prototype = {};
+
+            prototype.display = function() {
+                var x, y;
+
+                for (y in puzzles) {
+                    for(x in puzzles[y]) {
+                        if (puzzles[y][x]) {
+                            puzzles[y][x].display(x, y);
+                        }
+                    }
+                }
+            };
+
+            prototype.moveEvent = function(x, y) {
+                var xDiff = Math.abs(x - xNull);
+                var yDiff = Math.abs(y - yNull);
+
+                if (xDiff > 1 || yDiff > 1 || (yDiff > 0 && xDiff > 0)) {
+                    return;
+                } else {
+                    prevXNull = xNull;
+                    prevYNull = yNull;
+                    puzzles[y][x].executeMove(xNull, yNull);
+
+                    if (shuffledSteps == shuffleSteps) {
+                        steps++;
+                        document.getElementById('steps').innerHTML = steps;
+                    }
+
+                    puzzles[yNull][xNull] = puzzles[y][x];
+                    puzzles[y][x] = null;
+                    xNull = x;
+                    yNull = y;
+
+                    if (this.isRightOrder()) {
+                        this.winEvent();
+                    }
+                }
+            };
+
+            prototype.winEvent = function() {
+                this.addResultToHistory(steps, this.timeElapsed);
+
+                clearInterval(this.intervalId);
+
+                this.blockGameField();
+                this.showHistory();
+            };
+
+            prototype.blockGameField = function() {
+                document.getElementById('blockField').setAttribute(
+                    'style',
+                    'display: block'
+                );
+            };
+
+            prototype.unblockGameField = function() {
+                document.getElementById('blockField').setAttribute(
+                    'style',
+                    'display: none'
+                );
+            };
+
+            prototype.startGameEvent = function() {
+                if (gameStarted) {
+                    if (this.randTimer) {
+                        clearTimeout(this.randTimer);
+                    }
+
+                    document.getElementById(displayTo).innerHTML = "<div id='blockField'></div>";
+                    document.getElementById('controlButton').innerHTML = 'Start';
+
+                    this.resetGame();
+                } else {
+                    this.timeElapsed = 0;
+                    gameStarted = true;
+                    steps = 0;
+
+                    this.__randGame();
+
+                    document.getElementById('steps').innerHTML = steps.toString();
+                    document.getElementById('timer').innerHTML = this.buildTimerString(this.timeElapsed);
+                    document.getElementById('controlButton').innerHTML = 'Stop';
+                }
+            };
+
+            prototype.__randGame = function() {
+                var puzzleElement;
+                var puzzleForShuffle = [];
+
+                if (xNull + 1 < xMax && prevXNull != xNull + 1) {
+                    puzzleForShuffle[puzzleForShuffle.length] = {x: xNull + 1, y: yNull};
+                }
+
+                if (yNull + 1 < yMax && prevYNull != yNull + 1) {
+                    puzzleForShuffle[puzzleForShuffle.length] = {x: xNull, y: yNull + 1};
+                }
+
+                if (xNull - 1 >= 0 && prevXNull != xNull - 1) {
+                    puzzleForShuffle[puzzleForShuffle.length] = {x: xNull - 1, y: yNull};
+                }
+
+                if (yNull - 1 >= 0 && prevYNull != yNull - 1) {
+                    puzzleForShuffle[puzzleForShuffle.length] = {x: xNull, y: yNull - 1};
+                }
+
+                var puzzleElement = puzzleForShuffle[Math.round(Math.random() * (puzzleForShuffle.length - 1))];
+
+                this.moveEvent(puzzleElement.x, puzzleElement.y);
+
+                shuffledSteps++;
+
+                if (shuffledSteps < shuffleSteps) {
+                    this.randTimer = setTimeout(
+                        (function(_this) {
+                            return function() {
+                                _this.__randGame();
+                            };
+                        })(this),
+                        animationDelay
+                    );
+                } else {
+                    setTimeout((function(_this) {
+                        return function() {
+                            _this.unblockGameField();
+
+                            _this.intervalId = setInterval((function(__this) {
+                                return function() {
+                                    __this.timeElapsed++;
+
+                                    document.getElementById('timer').innerHTML = __this.buildTimerString(__this.timeElapsed);
+                                };
+                            })(_this), 1000);
+                        };
+                    })(this),
+                    animationDelay
+                    );
+                }
+            }
+
+            prototype.isRightOrder = function() {
+                var x, y, i;
+
+                for(y in puzzles) {
+                    for(x in puzzles[y]) {
+                        if (puzzles[y][x] == null) {
+                            continue;
+                        }
+
+                        i = parseInt(x) + 1 + parseInt(y) * parseInt(xMax);
+
+                        if (puzzles[y][x].getValue() != i) {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            };
+
+            prototype.buildTimerString = function(timeElapsed) {
+                var sec = timeElapsed % 60;
+                var min = Math.floor(timeElapsed / 60);
+
+                if (min < 10) {
+                    min = "0" + min.toString();
+                }
+
+                if (sec < 10) {
+                    sec = "0" + sec.toString();
+                }
+
+                return min + ":" + sec;
+            };
+
+            prototype.showHistory = function() {
+                var tbody = document.getElementById('historyTbody');
+                tbody.innerHTML = '';
+                var tableString = "";
+
+                if (this.isSupportsLocalStorage()) {
+                    var stats = localStorage.getItem('results');
+
+                    if (stats) {
+                        stats = JSON.parse(stats);
+                        var el;
+
+                        for (el in stats) {
+                            tableString += "<tr><td>" + stats[el].steps +
+                                           "</td><td>" + this.buildTimerString(stats[el].time) + "</td></tr>";
+                        }
+                    }
+                } else {
+                    if (this.isRightOrder()) {
+                        tableString = "<tr><td>" + steps + "</td><td>" + this.buildTimerString(this.timeElapsed) +
+                                      "</td></tr>"
+                    }
+                }
+
+                tbody.innerHTML = tableString;
+
+                document.getElementById('history').setAttribute('style', 'display:block');
+            };
+
+            prototype.addResultToHistory = function(steps, timeElapsed) {
+                if (this.isSupportsLocalStorage()) {
+                    var stats = localStorage.getItem('results');
+
+                    if (!stats) {
+                        stats = [];
+                    } else {
+                        stats = JSON.parse(stats);
+                    }
+
+                    stats.unshift({steps: steps, time: timeElapsed});
+
+                    localStorage.setItem("results", JSON.stringify(stats));
+                }
+            };
+
+            prototype.isSupportsLocalStorage = function() {
+                try {
+                    return 'localStorage' in window && window['localStorage'] !== null;
+                } catch (e) {
+                    return false;
+                }
+            };
+
+            prototype.resetGame = function() {
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                }
+
+                puzzles = [];
+                xNull = 3;
+                yNull = 3;
+                prevXNull = 3;
+                prevYNull = 3;
+                steps = 0;
+                this.timeElapsed = 0;
+                gameStarted = false;
+                shuffledSteps = 0;
+
+                document.getElementById('timer').innerHTML = this.buildTimerString(this.timeElapsed);
+                document.getElementById('steps').innerHTML = steps;
+
+                var x, y;
+
+                for (x = 0; x < xMax; x++) {
+                    for (y = 0; y < yMax; y++) {
+                        if (!(y in puzzles)) {
+                            puzzles[y] = [];
+                        }
+
+                        if (x == (xMax - 1) && y == (yMax - 1)) {
+                            puzzles[y][x] = null;
+                        } else {
+                            puzzles[y][x] = new Puzzle(this, x, y);
+                        }
+                    }
+                }
+
+                this.display();
+                this.blockGameField();
+            }
+
+            var constructor = function() {
+                this.resetGame();
+            }
+
+            constructor.prototype = prototype;
+
+            return constructor;
+        })();
+
+        var Puzzle = (function() {
+            var prototype = {
+                puzzleValue: 0
+            };
+
+            prototype.display = function(x, y) {
+                var blockNode = document.createElement('div');
+                this.element = blockNode;
+
+                this.setPosition(x, y);
+
+                blockNode.className = 'puzzle';
+                var spanNode = document.createElement('span');
+                var textNode = document.createTextNode(this.puzzleValue.toString());
+                spanNode.appendChild(textNode)
+                blockNode.appendChild(spanNode);
+                blockNode.onclick = (function(this_) {
+                    return function() {
+                        this_.moveEvent();
+                    }
+                })(this);
+
+                document.getElementById(displayTo).appendChild(blockNode);
+            };
+
+            prototype.moveEvent = function() {
+                this.field.moveEvent(this.x, this.y);
+            };
+
+            prototype.setPosition = function(x, y) {
+                this.x = x;
+                this.y = y;
+
+                var top = blockSize * y + topPadding;
+                var left = blockSize * x + leftPadding;
+
+                this.element.setAttribute('style', 'top: ' + top + 'px; left: ' + left + 'px');
+            }
+
+            prototype.executeMove = function(x, y) {
+                this.setPosition(x, y);
+            }
+
+            prototype.getValue = function() {
+                return this.puzzleValue;
+            }
+
+            var constructor = function(field, x, y) {
+                this.field = field;
+                this.puzzleValue = parseInt(x) + 1 + parseInt(y) * parseInt(xMax);
+            }
+
+            constructor.prototype = prototype;
+
+            return constructor;
+        })();
+
+        window.onload = function() {
+            var gameField = new Field();
+
+            if (!gameField.isSupportsLocalStorage()) {
+                alert("Your browser doesn't support LocalStorage and you can't save your game statistics");
+            }
+
+            document.getElementById('controlButton').onclick = (function(_gameField) {
+                return function() {
+                    _gameField.startGameEvent();
+                };
+            })(gameField);
+
+            document.getElementById('historyButton').onclick = (function(_gameField) {
+                return function() {
+                    _gameField.showHistory();
+                };
+            })(gameField);
+
+            document.getElementById('closeHistory').onclick = function() {
+                document.getElementById('history').setAttribute('style', 'display:none');
+            };
+        };
+    </script>
+</head>
+<body>
+    <div id="gameField">
+        <div id="blockField"></div>
+    </div>
+    <div id="controlPanel">
+        <div class="timer"><b>Timer:</b> <span id="timer"></span></div>
+        <div class="steps"><b>Steps:</b> <span id="steps"></span></div>
+        <div class="buttonsBlock">
+            <button id="controlButton">Start</button>
+            <button id="historyButton">History</button>
+        </div>
+    </div>
+    <div class="center-wrapper">
+        <div id="history">
+            <table>
+                <thead>
+                    <tr>
+                        <td>Steps</td>
+                        <td>Time</td>
+                    </tr>
+                </thead>
+                <tbody id="historyTbody"></tbody>
+            </table>
+
+            <button id="closeHistory">Close</button>
+        </div>
+    </div>
+</body>
+</html>
